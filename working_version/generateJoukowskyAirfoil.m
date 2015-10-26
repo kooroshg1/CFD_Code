@@ -10,13 +10,15 @@ format short g;
 % cross section of an airplane wing.
 
 N = 150; % Number of points on airfoil surface
+% x0 = -0.05; % Defines maximum thickness. [-1 0]
 x0 = -0.1; % Defines maximum thickness. [-1 0]
 dx0 = 0.00; % Perturbation in thickness
 xNew = x0 + dx0;
 x0 = x0 + dx0;
 
-y0 = 0.1; % Defines camber. Positive values for up camber [0 1]
-dy0 = 0.01; % Perturbation in camber
+% y0 = 0.3 + 0.0001; % Defines camber. Positive values for up camber [0 1]
+y0 = 0.1 + 0.0000; % Defines camber. Positive values for up camber [0 1]
+dy0 = 0.000; % Perturbation in camber
 yNew = y0 + dy0;
 % y0 = y0 - dy0;
 
@@ -91,8 +93,9 @@ end
 figure,
 plot(X,Y,'ko',...
      pointCloud(:,1),pointCloud(:,2),'r+')
-axis([-2 2 -2 2])
+axis([-1 1 -1 1])
 length(pointCloud)
+
 
 dlmwrite('point_cloud.txt',pointCloud);
 dlmwrite('point_cloud_sensitivity.txt',pointCloudSensitivity);

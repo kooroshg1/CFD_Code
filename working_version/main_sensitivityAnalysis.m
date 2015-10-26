@@ -5,13 +5,13 @@ clc;
 %-----------------------------------------------------------------------
 Re = 1e2;     % Reynolds number
 dt = 1e-2;    % time step
-tf = 1;    % final time
-xStart = 0;
-xEnd = 1;
-yStart = 0;
-yEnd = 1;
-nx = 100;      % number of x-gridpoints
-ny = 100;      % number of y-gridpoints
+tf = 5.0;    % final time
+xStart = 0.0;
+xEnd = 1.0;
+yStart = 0.0;
+yEnd = 1.0;
+nx = 400;      % number of x-gridpoints
+ny = 400;      % number of y-gridpoints
 nsteps = 10;  % number of steps with graphic output
 %-----------------------------------------------------------------------
 nt = ceil(tf/dt); dt = tf/nt;
@@ -20,13 +20,21 @@ y = linspace(yStart,yEnd,ny+1); hy = (yEnd - yStart)/ny;
 [Y,X] = meshgrid(y,x);
 %-----------------------------------------------------------------------
 % initial conditions
-U = zeros(nx-1,ny); V = zeros(nx,ny-1); Pressure = zeros(nx,ny); P = Pressure;
+U = zeros(nx-1,ny) + eps; V = zeros(nx,ny-1) + eps; Pressure = zeros(nx,ny) + eps; P = Pressure + eps;
 % boundary conditions
 uN = x*0+0;    vN = avg(x)*0;
 uS = x*0+0;      vS = avg(x)*0;
 uW = avg(y)*0+1; vW = y*0+0;
 uE = avg(y)*0+1; vE = y*0+0;
 
+%-----------------------------------------------------------------------
+% Free-slip boundary condition on top and bottom walls
+uN(2:end-1) = U(:,end);
+uS(2:end-1) = U(:,1);
+
+% Zero gradient for velocity on east wall
+uE = (mean(uW) ./ mean(U(end,:))) .* U(end,:);
+vE(2:end-1) = (mean(vW) ./ mean(V(end,:))) .* V(end,:);
 %-----------------------------------------------------------------------
 Ubc = dt/Re*...
     (...
@@ -86,7 +94,7 @@ deltaMatP = sparse(deltaMatP);
 deltaMatPSensitivity = sparse(deltaMatPSensitivity);
 
 alpha = -1e4;
-beta = -5e0;
+beta = -5e1;
 % break
 T = linspace(0,tf,nt);
 
@@ -101,6 +109,27 @@ for k = 1:nt
    % treat nonlinear terms
 %    gamma = min(1.2*dt*max(max(max(abs(U)))/hx,max(max(abs(V)))/hy),1);
    gamma = 0.0;
+   
+   % Free-slip boundary condition on top and bottom walls
+   uN(2:end-1) = U(:,end);
+   uS(2:end-1) = U(:,1);
+
+   % Zero gradient for velocity on east wall
+   uE = (mean(uW) ./ mean(U(end,:))) .* U(end,:);
+   vE(2:end-1) = (mean(vW) ./ mean(V(end,:))) .* V(end,:);
+
+   Ubc = dt/Re*...
+    (...
+    [2*uS(2:end-1)' zeros(nx-1,ny-2) 2*uN(2:end-1)'] / hx^2 + ...
+    [uW;zeros(nx-3,ny);uE] / hy^2 ...
+    );
+
+   Vbc = dt/Re*...
+    (...
+    [vS' zeros(nx,ny-3) vN'] / hx^2 + ...
+    [2*vW(2:end-1);zeros(nx-2,ny-1);2*vE(2:end-1)] / hy^2 ...
+    );
+
    Ue = [uW;U;uE]; Ue = [2*uS'-Ue(:,1) Ue 2*uN'-Ue(:,end)];
    Ve = [vS' V vN']; Ve = [2*vW-Ve(1,:);Ve;2*vE-Ve(end,:)];
    
@@ -137,11 +166,13 @@ for k = 1:nt
        fy = 0.0;
    end
    
-   rhs = reshape(U - dt * (dUUdX + dUVdY) + Ubc - diff(P) / hx,[],1) + dt * fx;
+%    rhs = reshape(U - dt * (dUUdX + dUVdY) + Ubc - diff(P) / hx,[],1) + dt * fx;
+   rhs = reshape(U - dt * (dUUdX + dUVdY) + Ubc,[],1) + dt * fx;
    u(peru) = Ru\(Rut\rhs(peru));
    U = reshape(u,nx-1,ny);
 
-   rhs = reshape(V - dt * (dVUdX + dVVdY) + Vbc  - diff(P')' / hy,[],1) + dt * fy;
+%    rhs = reshape(V - dt * (dVUdX + dVVdY) + Vbc  - diff(P')' / hy,[],1) + dt * fy;
+   rhs = reshape(V - dt * (dVUdX + dVVdY) + Vbc,[],1) + dt * fy;
    v(perv) = Rv\(Rvt\rhs(perv));
    V = reshape(v,nx,ny-1);
    
@@ -207,14 +238,21 @@ figure,plot(linspace(0,2*pi,length(xImm)),vBoundary);
 % %{
 % Sensitivity Analysis
 % initial conditions
-Up = zeros(nx-1,ny); Vp = zeros(nx,ny-1); Pressurep = zeros(nx,ny); Pp = Pressurep;
+Up = zeros(nx-1,ny) + eps; Vp = zeros(nx,ny-1) + eps; Pressurep = zeros(nx,ny) + eps; Pp = Pressurep;
 % boundary conditions
 UpN = x*0+0;    VpN = avg(x)*0;
 UpS = x*0+0;      VpS = avg(x)*0;
 UpW = avg(y)*0+0; VpW = y*0+0;
 UpE = avg(y)*0+0; VpE = y*0+0;
+%-----------------------------------------------------------------------
+% Free-slip boundary condition on top and bottom walls
+UpN(2:end-1) = Up(:,end);
+UpS(2:end-1) = Up(:,1);
 
-% ----------------------------------------------------------------------- %
+% Zero gradient for velocity on east wall
+UpE = (mean(UpW) ./ mean(Up(end,:))) .* Up(end,:);
+VpE(2:end-1) = (mean(VpW) ./ mean(Vp(end,:))) .* Vp(end,:);
+%-----------------------------------------------------------------------
 Upbc = dt/Re*...
     (...
     [2*UpS(2:end-1)' zeros(nx-1,ny-2) 2*UpN(2:end-1)'] / hx^2 + ...
@@ -231,8 +269,8 @@ fprintf('initialization (sensitivity analysis) \n')
 
 % Convective operator for U and V
 % upwindMatrix = upwindFiniteDifference(upwindMatrix,flowDirection,originalDirection,neededDirection,gamma)
-Ue = [uW;U;uE]; Ue = [2*uS'-Ue(:,1) Ue 2*uN'-Ue(:,end)];
-Ve = [vS' V vN']; Ve = [2*vW-Ve(1,:);Ve;2*vE-Ve(end,:)];
+Upe = [UpW;Up;UpE]; Upe = [2*UpS'-Upe(:,1) Upe 2*UpN'-Upe(:,end)];
+Vpe = [VpS' Vp VpN']; Vpe = [2*VpW-Vpe(1,:);Vpe;2*VpE-Vpe(end,:)];
 
 U_xMOMdx = upwindFiniteDifference(Ue,Ue,'x','x',gamma);
 U_xMOMdy = upwindFiniteDifference(Ue,Ve,'x','y',gamma);
@@ -260,6 +298,18 @@ for k = 1:nt
 %    gamma = min(1.2*dt*max(max(max(abs(Up)))/hx,max(max(abs(Vp)))/hy),1);
    gamma = 0.0;
 %    tic
+
+       % ADDED THIS ----------------------------------------------------------
+   % Free-slip boundary condition on top and bottom walls
+    UpN(2:end-1) = Up(:,end);
+    UpS(2:end-1) = Up(:,1);
+
+    % Zero gradient for velocity on east wall
+%     UpE = (mean(UpW) ./ mean(Up(end,:))) .* Up(end,:);
+%     VpE(2:end-1) = (mean(VpW) ./ mean(Vp(end,:))) .* Vp(end,:);
+    UpE = 1 .* Up(end,:);
+    VpE(2:end-1) = 1 .* Vp(end,:);
+    % ----------------------------------------------------------------- %
    Upe = [UpW;Up;UpE]; Upe = [2*UpS'-Upe(:,1) Upe 2*UpN'-Upe(:,end)];
    Vpe = [VpS' Vp VpN']; Vpe = [2*VpW-Vpe(1,:);Vpe;2*VpE-Vpe(end,:)];
    
@@ -323,11 +373,13 @@ for k = 1:nt
    end
 %    toc
 %    tic
-   rhs = reshape(Up - dt * (2 * dUUpdX + dUVpdY + dUpVdY) + Upbc - diff(Pp) / hx,[],1) + dt * fpx;
+%    rhs = reshape(Up - dt * (2 * dUUpdX + dUVpdY + dUpVdY) + Upbc - diff(Pp) / hx,[],1) + dt * fpx;
+   rhs = reshape(Up - dt * (2 * dUUpdX + dUVpdY + dUpVdY) + Upbc,[],1) + dt * fpx;
    u(peru) = Ru\(Rut\rhs(peru));
    Up = reshape(u,nx-1,ny);
    
-   rhs = reshape(Vp - dt * (dVUpdX + dVpUdX + 2 * dVVpdY) + Vpbc - diff(Pp')' / hy,[],1) + dt * fpy;
+%    rhs = reshape(Vp - dt * (dVUpdX + dVpUdX + 2 * dVVpdY) + Vpbc - diff(Pp')' / hy,[],1) + dt * fpy;
+   rhs = reshape(Vp - dt * (dVUpdX + dVpUdX + 2 * dVVpdY) + Vpbc,[],1) + dt * fpy;
    v(perv) = Rv\(Rvt\rhs(perv));
    Vp = reshape(v,nx,ny-1);
 %    toc
@@ -407,27 +459,40 @@ upBoundary = deltaMatU * reshape(Up,[],1);
 vpBoundary = deltaMatV * reshape(Vp,[],1);
 ppBoundary = deltaMatP * reshape(Pp,[],1);
 
-% Save data
-save('current_simulation_results/U_0','U')
-save('current_simulation_results/V_0','V')
-save('current_simulation_results/P_0','P')
-save('current_simulation_results/uBoundary_0','uBoundary')
-save('current_simulation_results/vBoundary_0','vBoundary')
-save('current_simulation_results/pBoundary_0','pBoundary')
-save('current_simulation_results/fyHist_0','fyHist')
-save('current_simulation_results/fxHist_0','fxHist')
-save('current_simulation_results/deltaMatU','deltaMatU')
-save('current_simulation_results/deltaMatV','deltaMatV')
-save('current_simulation_results/deltaMatP','deltaMatP')
+figure,
+subplot(2,1,1)
+plot(xImm,pBoundary)
+subplot(2,1,2)
+plot(xImm,ppBoundary)
+title('pressure')
+trapz(xImm,pBoundary)
 
-save('current_simulation_results/Up_CSA001_','Up')
-save('current_simulation_results/Vp_CSA001_','Vp')
-save('current_simulation_results/Pp_CSA001_','Pp')
-save('current_simulation_results/ppBoundary_CSA001_','ppBoundary')
-save('current_simulation_results/upBoundary_CSA001_','upBoundary')
-save('current_simulation_results/vpBoundary_CSA001_','vpBoundary')
-save('current_simulation_results/fpyHist_CSA001_','fpyHist')
-save('current_simulation_results/fpxHist_CSA001_','fpxHist')
+dlmwrite('mesh_convergence/ppBoundary.txt', ppBoundary)
+dlmwrite('mesh_convergence/Up.txt', Up)
+dlmwrite('mesh_convergence/Vp.txt', Vp)
+dlmwrite('mesh_convergence/Pp.txt', Pp)
+
+% Save data
+% save('current_simulation_results/U_0','U')
+% save('current_simulation_results/V_0','V')
+% save('current_simulation_results/P_0','P')
+% save('current_simulation_results/uBoundary_0','uBoundary')
+% save('current_simulation_results/vBoundary_0','vBoundary')
+% save('current_simulation_results/pBoundary_0','pBoundary')
+% save('current_simulation_results/fyHist_0','fyHist')
+% save('current_simulation_results/fxHist_0','fxHist')
+% save('current_simulation_results/deltaMatU','deltaMatU')
+% save('current_simulation_results/deltaMatV','deltaMatV')
+% save('current_simulation_results/deltaMatP','deltaMatP')
+% 
+% save('current_simulation_results/Up_CSA001_','Up')
+% save('current_simulation_results/Vp_CSA001_','Vp')
+% save('current_simulation_results/Pp_CSA001_','Pp')
+% save('current_simulation_results/ppBoundary_CSA001_','ppBoundary')
+% save('current_simulation_results/upBoundary_CSA001_','upBoundary')
+% save('current_simulation_results/vpBoundary_CSA001_','vpBoundary')
+% save('current_simulation_results/fpyHist_CSA001_','fpyHist')
+% save('current_simulation_results/fpxHist_CSA001_','fpxHist')
 % figure,plot(linspace(0,2*pi,length(xImm)),upBoundary);
 % figure,plot(linspace(0,2*pi,length(xImm)),vpBoundary);
 %}

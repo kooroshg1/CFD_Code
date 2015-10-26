@@ -7,13 +7,13 @@ fontsize = 50.0;
 %-----------------------------------------------------------------------
 Re = 1e2;     % Reynolds number
 dt = 1e-2;    % time step
-tf = 1.0;    % final time
+tf = 5.0;    % final time
 xStart = 0.0;
 xEnd = 1.0;
 yStart = 0.0;
 yEnd = 1.0;
-nx = 100;      % number of x-gridpoints
-ny = 100;      % number of y-gridpoints
+nx = 400;      % number of x-gridpoints
+ny = 400;      % number of y-gridpoints
 nsteps = 10;  % number of steps with graphic output
 %-----------------------------------------------------------------------
 nt = ceil(tf/dt); dt = tf/nt;
@@ -151,8 +151,12 @@ timeIntegralx = 0;
 timeIntegraly = 0;
 
 % centerLocation(timeIndex) = mean(pointCloud(:,1));
-  
+xu = linspace(xStart,xEnd,size(U,1));
+yu = linspace(yStart,yEnd,size(U,2));
+[Yu,Xu] = meshgrid(yu,xu);
+[Uin, Uon] = inpolygon(Xu, Yu, xImm, yImm); 
 for k = 1:nt
+    continue
 %     for subIteration = 1:maxSubIteration
        % treat nonlinear terms
     %    gamma = min(1.2*dt*max(max(max(abs(U)))/hx,max(max(abs(V)))/hy),1);
@@ -165,7 +169,7 @@ for k = 1:nt
        % Zero gradient for velocity on east wall
        uE = (mean(uW) ./ mean(U(end,:))) .* U(end,:);
        vE(2:end-1) = (mean(vW) ./ mean(V(end,:))) .* V(end,:);
-
+       
        Ubc = dt/Re*...
         (...
         [2*uS(2:end-1)' zeros(nx-1,ny-2) 2*uN(2:end-1)'] / hx^2 + ...
@@ -256,11 +260,10 @@ for k = 1:nt
            break
        end
 %        if rem(k,50) == 0
-%            xu = linspace(xStart,xEnd,size(U,1));
-%            yu = linspace(yStart,yEnd,size(U,2));
-%            [Yu,Xu] = meshgrid(yu,xu);
+%            Uplot = U;
+%            Uplot(Uin) = nan;
 %            figure(1),
-%            contourf(Xu,Yu,U,50,'linestyle','none')
+%            contourf(Xu,Yu,Uplot,50,'linestyle','none')
 %            colorbar;
 %            hold all
 %            plot(xImm,yImm,'w.','linewidth',2)
@@ -271,8 +274,8 @@ for k = 1:nt
 %            figureName = figureName + 1;
 %            pause(0.01)
 %            clf
-%     %        mean(pointCloud(:,1))
-%            dlmwrite(['surfacePressureHistory/' num2str(figureName)],deltaMatP * reshape(P,[],1));
+% %     %        mean(pointCloud(:,1))
+% %            dlmwrite(['surfacePressureHistory/' num2str(figureName)],deltaMatP * reshape(P,[],1));
 %        end
 end
 fprintf('\n')
@@ -353,7 +356,16 @@ ypBoundary = deltaMatP * reshape(Yp,[],1);
 % ylabel('Pressure','fontsize',fontsize)
 % set(gca,'fontsize',fontsize)
 
-figure,scatter3(xImm,yImm,uBoundary)
+filterDegree = 17;
+filterSize = 41;
+figure,scatter3(xImm,yImm,uBoundary),title('u')
+% figure,plot(xImm,pBoundary),title('pressure')
+figure,
+% plot(xImm,sgolayfilt(pBoundary,filterDegree,filterSize),...
+%      xImm,pBoundary)
+plot(xImm,sgolayfilt(pBoundary,filterDegree,filterSize))
+title('pressure')
+trapz(xImm,pBoundary)
 
 % Save data
 % save('current_simulation_results/U_0000001','U')
@@ -369,3 +381,26 @@ figure,scatter3(xImm,yImm,uBoundary)
 % Vavg = avg(V);
 % figure,
 % contourf(sqrt(Uavg.^2 + Vavg.^2))
+
+dlmwrite('mesh_convergence/xImm', xImm)
+dlmwrite('mesh_convergence/yImm', yImm)
+dlmwrite('mesh_convergence/Xu.txt', Xu)
+dlmwrite('mesh_convergence/Yu.txt', Yu)
+dlmwrite('mesh_convergence/Xv.txt', Xv)
+dlmwrite('mesh_convergence/Yv.txt', Yv)
+dlmwrite('mesh_convergence/Xp.txt', Xp)
+dlmwrite('mesh_convergence/Yp.txt', Yp)
+% dlmwrite('mesh_convergence/U0.txt', U)
+% dlmwrite('mesh_convergence/V0.txt', V)
+% dlmwrite('mesh_convergence/P0.txt', P)
+% dlmwrite('mesh_convergence/p0Boundary.txt', pBoundary)
+
+% dlmwrite('mesh_convergence/U1.txt', U)
+% dlmwrite('mesh_convergence/V1.txt', V)
+% dlmwrite('mesh_convergence/P1.txt', P)
+% dlmwrite('mesh_convergence/p1Boundary.txt', pBoundary)
+
+% dlmwrite('mesh_convergence/U_CS.txt', imag(U) / -0.0001)
+% dlmwrite('mesh_convergence/V_CS.txt', imag(V) / -0.0001)
+% dlmwrite('mesh_convergence/P_CS.txt', imag(P) / -0.0001)
+% dlmwrite('mesh_convergence/pBoundary_CS.txt', imag(pBoundary) / -0.0001)
